@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -7,10 +7,11 @@ public class Spawner : MonoBehaviour
 {
     public static Spawner Instance { get; private set; }
 
-    public static event Action<int> OnWaveChanged;
+	public static event Action<int> OnWaveChanged;
     public static event Action OnMissionComplete;
+	public static event Action<bool> OnWaveCooldownChanged; // 👈 НОВОЕ
 
-    private WaveData[] _waves => LevelManager.Instance.CurrentLevel.waves;
+	private WaveData[] _waves => LevelManager.Instance.CurrentLevel.waves;
     private int _currentWaveIndex = 0;
     private int _waveCounter = 0;
     private WaveData CurrentWave => _waves[_currentWaveIndex];
@@ -30,8 +31,14 @@ public class Spawner : MonoBehaviour
 
     private Dictionary<EnemyType, ObjectPooler> _poolDictionary;
 
-    private float _timeBetweenWaves = 1f;
-    private float _waveCooldown;
+	[Header("Wave Timing")]
+	[SerializeField] private float _timeBetweenWaves = 10f;
+	[SerializeField] private int _earlyStartBonus = 25;
+	public float WaveCooldownRemaining => _waveCooldown;
+	public float WaveCooldownProgress => _waveCooldown / _timeBetweenWaves; // 0.0 - 1.0
+	public bool IsBetweenWaves => _isBetweenWaves;
+
+	private float _waveCooldown;
     private bool _isBetweenWaves = false;
     private bool _isEndlessMode = false;
     private bool _isGamePlayScene = false;
@@ -99,7 +106,9 @@ public class Spawner : MonoBehaviour
                 _enemiesRemoved = 0;
                 _spawnTimer = 0f;
                 _isBetweenWaves = false;
-            }
+
+				OnWaveCooldownChanged?.Invoke(false);
+			}
         }
         else
         {
@@ -118,9 +127,13 @@ public class Spawner : MonoBehaviour
                 }
                 else
                 {
-                    _isBetweenWaves = true;
+					Debug.Log("Spawner: Волна завершена, начинаем кулдаун");
+					_isBetweenWaves = true;
                     _waveCooldown = _timeBetweenWaves;
-                }
+
+					Debug.Log($"Spawner: Вызываем OnWaveCooldownChanged(true)");
+					OnWaveCooldownChanged?.Invoke(true);
+				}
             }
         }
     }
@@ -190,4 +203,26 @@ public class Spawner : MonoBehaviour
             }
         }
     }
+
+	public void SkipWaveCooldown()
+	{
+		if (!_isBetweenWaves)
+		{
+			Debug.LogWarning("Нельзя скипнуть - волна уже идёт!");
+			return;
+		}
+
+		// Награда пропорциональна оставшемуся времени
+		int bonusResources = Mathf.RoundToInt((_waveCooldown / _timeBetweenWaves) * _earlyStartBonus);
+
+		if (bonusResources > 0)
+		{
+			GameManager.Instance.AddResources(bonusResources);
+			Debug.Log($"⭐ Получено {bonusResources} ресурсов за ранний старт!");
+		}
+
+		_waveCooldown = 0f;
+		// AudioManager.Instance.PlaySound(AudioManager.Instance.buttonClickSound);
+	}
+
 }

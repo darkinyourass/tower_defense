@@ -66,7 +66,7 @@ public class GameManager : MonoBehaviour
         AddResources(Mathf.RoundToInt(enemy.Data.resourceReward));
     }
 
-    private void AddResources(int amount)
+    public  void AddResources(int amount)
     {
         _resources += amount;
         OnResourcesChanged?.Invoke(_resources);
